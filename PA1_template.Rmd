@@ -8,18 +8,93 @@ output:
 
 ## Loading and preprocessing the data
 
+Read the csv from the zip, and convert the date column to Date class.
+```{r}
+library(data.table)
+#unzip('activity.zip')
+data <- read.csv('activity.csv')
+data$date <- as.Date(data$date)
+data <- data.table(data)
+```
 
 
 ## What is mean total number of steps taken per day?
+Total number of steps per day:
+```{r}
+steps.per.day <- data[, .(total = sum(steps, na.rm = T)), by = date]
+steps.per.day
+```
 
+Histogram of steps per day:
+```{r}
+library(ggplot2)
+qplot(total, data = steps.per.day, geom = 'histogram', binwidth = 2000, color = I('white'))
+```
 
+Mean of total steps per day:
+```{r}
+mean(steps.per.day$total)
+```
+
+Median of total steps per day:
+```{r}
+median(steps.per.day$total)
+```
 
 ## What is the average daily activity pattern?
 
+Number of steps across average day:
+```{r}
+steps.per.interval <- data[, .(mean.steps = mean(steps, na.rm = T)), by = interval]
+qplot(interval, mean.steps, data = steps.per.interval, geom = 'line')
+```
 
+The interval with max steps is:
+```{r}
+steps.per.interval[mean.steps == max(mean.steps), interval]
+```
 
 ## Imputing missing values
 
+Total number of missing values in the dataset:
+```{r}
+data[is.na(steps), .N]
+```
 
+Missing values will be filled with average steps for that interval:
+```{r}
+setkey(data, interval)
+setkey(steps.per.interval, interval)
+data[, steps := as.double(steps)]
+data.filled <- steps.per.interval[data]
+data.filled[is.na(steps), steps := mean.steps]
+```
+
+Histogram of steps per day after imputation:
+```{r}
+steps.per.day <- data.filled[, .(total = sum(steps, na.rm = T)), by = date]
+qplot(total, data = steps.per.day, geom = 'histogram', binwidth = 2000, color = I('white'))
+```
+
+Mean of total steps per day after imputation:
+```{r}
+mean(steps.per.day$total)
+```
+
+Median of total steps per day after imputation:
+```{r}
+median(steps.per.day$total)
+```
+
+The new mean and median values are different from the values before imputation. Imputation makes the histogram more symetric.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+Create a new factor indicating weekdays or weekends, and show the difference in day activities:
+```{r}
+data[, weekday := factor(ifelse(weekdays(date) %in% c('Saturday', 'Sunday'), 'Weekend', 'Weekday'))]
+steps.per.interval <- data[, .(mean.steps = mean(steps, na.rm = T)), by = .(interval, weekday)]
+qplot(interval, mean.steps, data = steps.per.interval, geom = 'line') + facet_wrap(~weekday, ncol = 1)
+```
+
+
